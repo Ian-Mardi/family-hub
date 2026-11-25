@@ -670,6 +670,10 @@ function App() {
     }
   }, [session])
 
+  const signInRequested =
+    new URLSearchParams(window.location.search).get('signin') === '1' ||
+    window.location.pathname === '/login'
+
   if (window.location.pathname === '/welcome') return <PublicPage />
 
   if (loading) {
@@ -677,7 +681,7 @@ function App() {
   }
 
   if (!session) {
-    return <Auth />
+    return signInRequested ? <Auth /> : <PublicPage />
   }
 
   if (familyError) {

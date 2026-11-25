@@ -74,6 +74,7 @@ function Dashboard() {
   const [pollOptions,setPollOptions]=useState('')
   const [pollPopup,setPollPopup]=useState<any|null>(null)
   const [pollVote,setPollVote]=useState('')
+  const [showNotifications,setShowNotifications]=useState(false)
   const [tasks, setTasks] = useState<FamilyTask[]>([])
   const [taskMembers, setTaskMembers] = useState<Record<string, string>>({})
   const [tasksLoading, setTasksLoading] = useState(false)
@@ -177,8 +178,8 @@ useEffect(() => {
   // LOAD FAMILY GROUP CHAT PREVIEW AND LIVE UPDATES
   useEffect(()=>{if(!familyId)return; let cancelled=false; let channel:any=null; async function loadPreview(){const {data:gid,error}=await supabase.rpc('ensure_family_group'); if(error||!gid)return; const {data}=await supabase.from('messages').select('sender_id,content,created_at').eq('conversation_id',gid).order('created_at',{ascending:false}).limit(1); if(!cancelled)setGroupPreview(data?.[0]||null); channel=supabase.channel('home-group-preview-'+gid).on('postgres_changes',{event:'*',schema:'public',table:'messages',filter:'conversation_id=eq.'+gid},()=>{supabase.from('messages').select('sender_id,content,created_at').eq('conversation_id',gid).order('created_at',{ascending:false}).limit(1).then(({data})=>{if(!cancelled)setGroupPreview(data?.[0]||null)})}).subscribe()} loadPreview(); return ()=>{cancelled=true;if(channel)supabase.removeChannel(channel)}},[familyId])
 
-  // FAMILY POLLS
-  useEffect(()=>{if(!familyId)return; let cancelled=false; async function loadPolls(){setPollLoading(true); const {data}=await supabase.from('family_polls').select('*').eq('family_id',familyId).eq('active',true).order('created_at',{ascending:false}); if(!cancelled){setPolls(data||[]);setPollLoading(false)}} loadPolls(); return ()=>{cancelled=true}},[familyId])
+  // FAMILY POLLS (hide polls that have reached their end date)
+  useEffect(()=>{if(!familyId)return; let cancelled=false; async function loadPolls(){setPollLoading(true); const {data}=await supabase.from('family_polls').select('*').eq('family_id',familyId).eq('active',true).order('created_at',{ascending:false}); const now=Date.now(); const current=(data||[]).filter((p:any)=>{const end=p.ends_at||p.end_at||p.expires_at;return !end||new Date(end).getTime()>now}); if(!cancelled){setPolls(current);setPollLoading(false)}} loadPolls(); return ()=>{cancelled=true}},[familyId])
 
   // SHOW ONE ACTIVE FAMILY POLL ON APP OPEN IF NOT VOTED
   useEffect(()=>{if(!familyId||!polls.length)return; let cancelled=false; async function checkVote(){const {data:u}=await supabase.auth.getUser();const user=u.user?.id;if(!user)return; const poll=polls.find(p=>p.popup_enabled && !(p.votes||[]).some((v:any)=>v.user_id===user));if(poll&&!cancelled){setPollPopup(poll);setPollVote('')}} checkVote();return()=>{cancelled=true}},[familyId,polls])
@@ -383,29 +384,19 @@ useEffect(() => {
                 </div>
               </div>
 
-              <button className="header-button" aria-label="Notifications">
+              <button className="header-button" aria-label="Notifications" onClick={()=>setShowNotifications(v=>!v)} aria-expanded={showNotifications}>
                 <Bell size={21} />
-                <span className="notification-dot" />
+                {(familyEvents.length+tasks.filter(t=>!t.completed_at).length+polls.length)>0&&<span className="notification-dot" />}
               </button>
+              {showNotifications&&<div className="notification-popover">
+                <div className="notification-popover-head"><strong>Notifications</strong><button onClick={()=>setShowNotifications(false)} aria-label="Close"><X size={17}/></button></div>
+                {familyEvents.filter(e=>new Date(e.starts_at).getTime()>Date.now()).slice(0,3).map(e=><button className="notification-item" key={'event'+e.id} onClick={()=>{setActiveTab('Calendar');setShowNotifications(false)}}><span className="notification-icon"><CalendarDays size={17}/></span><span><strong>Upcoming event</strong><small>{e.title} · {new Date(e.starts_at).toLocaleDateString()}</small></span></button>)}
+                {tasks.filter(t=>!t.completed_at).slice(0,3).map(t=><button className="notification-item" key={'task'+t.id} onClick={()=>{setActiveTab('More');setMoreSection('Tasks');setShowNotifications(false)}}><span className="notification-icon"><CheckSquare size={17}/></span><span><strong>Task pending</strong><small>{t.title}</small></span></button>)}
+                {polls.slice(0,3).map(p=><button className="notification-item" key={'poll'+p.id} onClick={()=>{setActiveTab('More');setMoreSection('Polls');setShowNotifications(false)}}><span className="notification-icon"><Bell size={17}/></span><span><strong>Active poll</strong><small>{p.title}</small></span></button>)}
+                {groupPreview&&<button className="notification-item" onClick={()=>{setActiveTab('Messages');setShowNotifications(false)}}><span className="notification-icon"><MessageCircle size={17}/></span><span><strong>Latest family message</strong><small>{groupPreview.content.slice(0,80)}</small></span></button>}
+                {!familyEvents.filter(e=>new Date(e.starts_at).getTime()>Date.now()).length&&!tasks.filter(t=>!t.completed_at).length&&!polls.length&&!groupPreview&&<p className="notification-empty">You're all caught up.</p>}
+              </div>}
             </header>
-
-            {!requestAnswered && (
-              <button
-                className="persistent-request"
-                onClick={() => setShowRequest(true)}
-              >
-                <span className="request-alert-icon">
-                  <Bell size={17} />
-                </span>
-
-                <span className="request-alert-text">
-                  <strong>Action needed</strong>
-                  <small>Vote on the Christmas card photo</small>
-                </span>
-
-                <ChevronRight size={19} />
-              </button>
-            )}
 
             {homeWidgets.includes('calendar') && <section className="dashboard-section calendar-section">
               <div className="section-heading">
@@ -499,7 +490,7 @@ useEffect(() => {
         {/* FAMILY AI */}
 
         {activeTab === 'Family AI' && (
-          <FamilyAI />
+          <FamilyAI accent={accent} appearance={appearance} />
         )}
 
         {/* GALLERY */}

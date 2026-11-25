@@ -42,6 +42,7 @@ export default function Messaging() {
   const [searchTerm,setSearchTerm]=useState('')
   const [searchOpen,setSearchOpen]=useState(false)
   const [listFilter,setListFilter]=useState<'all'|'groups'|'people'>('all')
+  const [showStartModal,setShowStartModal]=useState(false)
 
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -424,10 +425,11 @@ if (latestMessagesError) {
 
   return (
     <div className="messaging-page">
+      {showStartModal&&<div className="start-chat-overlay"><div className="start-chat-modal"><div className="start-chat-head"><strong>New conversation</strong><button onClick={()=>setShowStartModal(false)} aria-label="Close">×</button></div>{familyMembers.filter(m=>m.user_id!==userId).map(m=><button className="start-chat-member" key={m.user_id} onClick={()=>{setShowStartModal(false);startConversation(m)}}><span className="messaging-avatar"><MessageCircle size={20}/></span><span>{m.display_name||'Family member'}</span></button>)}{familyMembers.filter(m=>m.user_id!==userId).length===0&&<p>No other family members found.</p>}</div></div>}
       {showConversationList ? (
         <>
           <header className="messaging-list-header">
-            <div className="messaging-brand"><div className="messaging-avatar"><MessageCircle size={21} /></div><span>Family Hub</span><button className="new-chat-action" aria-label="Start conversation"><Plus size={21}/></button></div>
+            <div className="messaging-brand"><div className="messaging-avatar"><MessageCircle size={21} /></div><span>Family Hub</span><button className="new-chat-action" aria-label="Start conversation" onClick={()=>setShowStartModal(true)}><Plus size={21}/></button></div>
             <h1>Messages</h1>
             <div className="conversation-search"><Search size={18}/><input value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} placeholder="Search family conversations..."/></div>
             <div className="conversation-filters">{(['all','groups','people'] as const).map(f=><button key={f} className={listFilter===f?'active':''} onClick={()=>setListFilter(f)}>{f==='all'?'All':f==='groups'?'Groups':'People'}</button>)}</div>

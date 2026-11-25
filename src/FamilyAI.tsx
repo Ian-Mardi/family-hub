@@ -21,7 +21,7 @@ type PendingAction = {
   ends_at?: string
 }
 
-export default function FamilyAI() {
+export default function FamilyAI({ accent, appearance }: { accent: string; appearance: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [historyKey, setHistoryKey] = useState('')
   useEffect(() => { let cancelled=false; async function loadHistory(){ const {data}=await supabase.auth.getUser(); if(!data.user)return; const key='fh-ai-history-'+data.user.id; setHistoryKey(key); try {const saved=JSON.parse(localStorage.getItem(key)||'[]'); if(!cancelled && Array.isArray(saved))setMessages(saved)}catch{}} loadHistory(); return ()=>{cancelled=true} },[])
@@ -148,7 +148,7 @@ export default function FamilyAI() {
   }
 
   return (
-    <div className="family-ai-page">
+    <div className={`family-ai-page ${appearance === 'dark' ? 'family-ai-dark' : ''}`} style={{ ['--ai-accent' as string]: accent }}>
       <header className="family-ai-header">
         <div className="family-ai-icon">
           <Sparkles size={22} />
